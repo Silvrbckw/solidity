@@ -41,7 +41,7 @@ def writeSourceToFile(lines):
     # print("sourceName is ", srcName)
     # print("filePath is", filePath)
     if filePath:
-        os.system("mkdir -p " + filePath)
+        os.system(f"mkdir -p {filePath}")
     with open(srcName, mode='a+', encoding='utf8', newline='') as f:
         createdSources.append(srcName)
         for idx, line in enumerate(lines[1:]):
@@ -68,16 +68,14 @@ if __name__ == '__main__':
             writeSourceToFile(lines)
 
         if hasMultipleSources:
-            srcString = ""
-            for src in createdSources:
-                srcString += src + ' '
+            srcString = "".join(f'{src} ' for src in createdSources)
             print(srcString)
             sys.exit(0)
         else:
             sys.exit(1)
 
     except UnicodeDecodeError as ude:
-        print("UnicodeDecodeError in '" + filePath + "': " + str(ude))
+        print(f"UnicodeDecodeError in '{filePath}': {str(ude)}")
         print("This is expected for some tests containing invalid utf8 sequences. "
               "Exception will be ignored.")
         sys.exit(2)

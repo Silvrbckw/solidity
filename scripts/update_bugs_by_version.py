@@ -20,11 +20,8 @@ bugs = json.loads((root_path / 'docs/bugs.json').read_text(encoding='utf8'))
 versions = {}
 with (root_path / 'Changelog.md').open(encoding='utf8') as changelog:
     for line in changelog:
-        m = re.search(r'^### (\S+) \((\d+-\d+-\d+)\)$', line)
-        if m:
-            versions[m.group(1)] = {}
-            versions[m.group(1)]['released'] = m.group(2)
-
+        if m := re.search(r'^### (\S+) \((\d+-\d+-\d+)\)$', line):
+            versions[m[1]] = {'released': m[2]}
 for key, value in versions.items():
     value['bugs'] = []
     for bug in bugs:

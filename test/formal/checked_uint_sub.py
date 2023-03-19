@@ -8,9 +8,7 @@ Overflow checked unsigned integer subtraction.
 """
 
 n_bits = 256
-type_bits = 8
-
-while type_bits <= n_bits:
+for type_bits in range(8, n_bits + 1, 8):
 
 	rule = Rule()
 
@@ -30,11 +28,5 @@ while type_bits <= n_bits:
 	maxValue = BVUnsignedMax(type_bits, n_bits)
 
 	# Overflow check in YulUtilFunction::overflowCheckedIntSubFunction
-	if type_bits == 256:
-		overflow_check = GT(diff, X)
-	else:
-		overflow_check = GT(diff, maxValue)
-
-	type_bits += 8
-
+	overflow_check = GT(diff, X) if type_bits == 256 else GT(diff, maxValue)
 	rule.check(overflow_check != 0, actual_overflow)
