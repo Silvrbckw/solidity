@@ -17,16 +17,16 @@ class JobNotSuccessful(APIHelperError):
 
         self.name = name
         self.status = status
-        self.job_finished = (status in ['failed', 'blocked'])
+        self.job_finished = status in {'failed', 'blocked'}
 
-        if status == 'not_running':
-            message = f"Job {name} has not started yet."
-        elif status == 'blocked':
+        if status == 'blocked':
             message = f"Job {name} will not run because one of its dependencies failed."
-        elif status == 'running':
-            message = f"Job {name} is still running."
         elif status == 'failed':
             message = f"Job {name} failed."
+        elif status == 'not_running':
+            message = f"Job {name} has not started yet."
+        elif status == 'running':
+            message = f"Job {name} is still running."
         else:
             message = f"Job {name} did not finish successfully. Current status: {status}."
 
@@ -137,15 +137,14 @@ class CircleCI:
             {'branch': branch} if branch is not None else {},
             max_pages=10,
         ):
-            matching_items = [
+            if matching_items := [
                 item
                 for item in items
                 if (
-                    (commit_hash is None or item['vcs']['revision'] == commit_hash) and
-                    item['trigger']['type'] not in excluded_trigger_types
+                    (commit_hash is None or item['vcs']['revision'] == commit_hash)
+                    and item['trigger']['type'] not in excluded_trigger_types
                 )
-            ]
-            if len(matching_items) > 0:
+            ]:
                 return matching_items
 
         return []

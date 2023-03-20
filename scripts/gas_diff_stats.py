@@ -102,9 +102,9 @@ def semantictest_statistics():
     def try_parse_git_diff(fname):
         try:
             diff_output = subprocess.check_output(
-                "git diff --unified=0 origin/develop HEAD " + fname,
+                f"git diff --unified=0 origin/develop HEAD {fname}",
                 shell=True,
-                universal_newlines=True
+                universal_newlines=True,
             ).splitlines()
             if diff_output:
                 return collect_statistics(diff_output)
@@ -112,6 +112,7 @@ def semantictest_statistics():
             print("Error in the git diff:")
             print(e.output)
         return None
+
     def stat(old, new):
         return ((new - old) / old) * 100  if old else 0
 

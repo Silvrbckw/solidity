@@ -53,11 +53,7 @@ def getCharFromStdin() -> str:
     """
     Gets a single character from stdin without line-buffering.
     """
-    if os.name == 'nt':
-        # pragma pylint: disable=import-error
-        return msvcrt.getch().decode("utf-8")
-    else:
-        return sys.stdin.read(1)
+    return msvcrt.getch().decode("utf-8") if os.name == 'nt' else sys.stdin.read(1)
 
 
 """
@@ -142,14 +138,14 @@ def prepend_comments(sequence):
     """
     result = ""
     for line in sequence.splitlines(True):
-        result = result + "// " + line
+        result = f"{result}// {line}"
     return result
 
 
 # {{{ JsonRpcProcess
 class BadHeader(Exception):
     def __init__(self, msg: str):
-        super().__init__("Bad header: " + msg)
+        super().__init__(f"Bad header: {msg}")
 
 class JsonRpcProcess:
     exe_path: str
@@ -212,10 +208,7 @@ class JsonRpcProcess:
                 if not line.isdigit():
                     raise BadHeader("size is not int")
                 message_size = int(line)
-            elif line.startswith(CONTENT_TYPE_HEADER):
-                # nothing todo with type for now.
-                pass
-            else:
+            elif not line.startswith(CONTENT_TYPE_HEADER):
                 raise BadHeader("unknown header")
         if message_size is None:
             raise BadHeader("missing size")
@@ -240,9 +233,7 @@ class JsonRpcProcess:
 
     def call_method(self, method_name: str, params: Optional[dict], expects_response: bool = True) -> Any:
         self.send_message(method_name, params)
-        if not expects_response:
-            return None
-        return self.receive_message()
+        return self.receive_message() if expects_response else None
 
     def send_notification(self, name: str, params: Optional[dict] = None) -> None:
         self.send_message(name, params)
@@ -361,7 +352,7 @@ def extendEnd(marker, amount=1):
 class TestParserException(Exception):
     def __init__(self, incompleteResult, msg: str):
         self.result = incompleteResult
-        super().__init__("Failed to parse test specification: " + msg)
+        super().__init__(f"Failed to parse test specification: {msg}")
 
 class TestParser:
     """
@@ -428,9 +419,7 @@ class TestParser:
         Parse diagnostic expectations specified in the file.
         Returns a named tuple instance of "Diagnostics"
         """
-        diagnostics = { "tests": {}, "has_header": True }
-
-        diagnostics["start"] = self.position()
+        diagnostics = {"tests": {}, "has_header": True, "start": self.position()}
 
         while not self.at_end():
             fileDiagMatch = TEST_REGEXES.fileDiagnostics.match(self.current_line())
@@ -441,12 +430,15 @@ class TestParser:
 
             diagnostics_string = fileDiagMatch.group("diagnostics")
             if diagnostics_string is not None:
-                for diagnosticMatch in TEST_REGEXES.diagnostic.finditer(diagnostics_string):
-                    testDiagnostics.append(self.Diagnostic(
+                testDiagnostics.extend(
+                    self.Diagnostic(
                         diagnosticMatch.group("tag"),
-                        int(diagnosticMatch.group("code"))
-                    ))
-
+                        int(diagnosticMatch.group("code")),
+                    )
+                    for diagnosticMatch in TEST_REGEXES.diagnostic.finditer(
+                        diagnostics_string
+                    )
+                )
             diagnostics["tests"][fileDiagMatch.group("testname")] = testDiagnostics
 
             self.next_line()
@@ -466,7 +458,9 @@ class TestParser:
         # Parse request header
         requestResult = TEST_REGEXES.sendRequest.match(self.current_line())
         if requestResult is None:
-            raise TestParserException(ret, "Method for request not found on line " + self.current_line())
+            raise TestParserException(
+                ret, f"Method for request not found on line {self.current_line()}"
+            )
 
         ret["method"] = requestResult.group("method")
         ret["request"] = "{\n"
@@ -587,10 +581,12 @@ class FileTestRunner:
                 expected_diagnostics_per_file[self.test_name] = []
 
             published_diagnostics = \
-                self.suite.open_file_and_wait_for_diagnostics(self.solc, self.test_name, self.sub_dir)
+                    self.suite.open_file_and_wait_for_diagnostics(self.solc, self.test_name, self.sub_dir)
 
             for diagnostics in published_diagnostics:
-                if not diagnostics["uri"].startswith(self.suite.project_root_uri + "/"):
+                if not diagnostics["uri"].startswith(
+                    f"{self.suite.project_root_uri}/"
+                ):
                     raise RuntimeError(
                         f"'{self.test_name}.sol' imported file outside of test directory: '{diagnostics['uri']}'"
                     )
@@ -747,13 +743,15 @@ class FileTestRunner:
             if isinstance(actualResponseJson["result"], list):
                 for result in actualResponseJson["result"]:
                     if "uri" in result:
-                        result["uri"] = result["uri"].replace(self.suite.project_root_uri + "/" + self.sub_dir + "/", "")
+                        result["uri"] = result["uri"].replace(
+                            f"{self.suite.project_root_uri}/{self.sub_dir}/", ""
+                        )
 
             elif isinstance(actualResponseJson["result"], dict):
                 if "changes" in actualResponseJson["result"]:
                     changes = actualResponseJson["result"]["changes"]
                     for key in list(changes.keys()):
-                        new_key = key.replace(self.suite.project_root_uri + "/", "")
+                        new_key = key.replace(f"{self.suite.project_root_uri}/", "")
                         changes[new_key] = changes[key]
                         del changes[key]
 
@@ -851,7 +849,9 @@ class SolidityLSPTestSuite: # {{{
         colorama.init()
         args = create_cli_parser().parse_args()
         self.solc_path = args.solc_path
-        self.project_root_dir = os.path.realpath(args.project_root_dir) + "/test/libsolidity/lsp"
+        self.project_root_dir = (
+            f"{os.path.realpath(args.project_root_dir)}/test/libsolidity/lsp"
+        )
         self.project_root_uri = PurePath(self.project_root_dir).as_uri()
         self.print_assertions = args.print_assertions
         self.trace_io = args.trace_io
@@ -877,7 +877,7 @@ class SolidityLSPTestSuite: # {{{
             filtered_tests.append("generic")
 
         for method_name in filtered_tests:
-            test_fn = getattr(self, 'test_' + method_name)
+            test_fn = getattr(self, f'test_{method_name}')
             title: str = test_fn.__name__[5:]
             print(f"{SGR_TEST_BEGIN}Testing {title} ...{SGR_RESET}")
             try:
@@ -918,7 +918,9 @@ class SolidityLSPTestSuite: # {{{
         """
         project_root_uri_with_maybe_subdir = self.project_root_uri
         if project_root_subdir is not None:
-            project_root_uri_with_maybe_subdir = self.project_root_uri + '/' + project_root_subdir
+            project_root_uri_with_maybe_subdir = (
+                f'{self.project_root_uri}/{project_root_subdir}'
+            )
         params = {
             'processId': None,
             'rootUri': project_root_uri_with_maybe_subdir,
@@ -943,7 +945,7 @@ class SolidityLSPTestSuite: # {{{
             params['initializationOptions'] = {}
             params['initializationOptions']['file-load-strategy'] = file_load_strategy.value
 
-        if custom_include_paths is not None and len(custom_include_paths) != 0:
+        if custom_include_paths is not None and custom_include_paths:
             if params['initializationOptions'] is None:
                 params['initializationOptions'] = {}
             params['initializationOptions']['include-paths'] = custom_include_paths
@@ -980,7 +982,7 @@ class SolidityLSPTestSuite: # {{{
         An exception is raised on expectation failures.
         """
         assert message is not None
-        if 'error' in message.keys():
+        if 'error' in message:
             code = message['error']["code"]
             text = message['error']['message']
             raise RuntimeError(f"Error {code} received. {text}")
@@ -997,7 +999,7 @@ class SolidityLSPTestSuite: # {{{
 
         num_files = solc.receive_message()["params"]["openFileCount"]
 
-        for _ in range(0, num_files):
+        for _ in range(num_files):
             message = solc.receive_message()
 
             assert message is not None # This can happen if the server aborts early.
@@ -1012,7 +1014,7 @@ class SolidityLSPTestSuite: # {{{
         return sorted(reports, key=lambda x: x['uri'])
 
     def normalizeUri(self, uri):
-        return uri.replace(self.project_root_uri + "/", "")[:-len(".sol")]
+        return uri.replace(f"{self.project_root_uri}/", "")[:-len(".sol")]
 
     def fetch_and_format_diagnostics(self, solc: JsonRpcProcess, test, sub_dir=None):
         expectations = ""
@@ -1047,15 +1049,13 @@ class SolidityLSPTestSuite: # {{{
         content,
         current_diagnostics: TestParser.Diagnostics
     ):
-        test_header = ""
-
-        if not current_diagnostics.has_header:
-            test_header = f"{TestParser.TEST_START}\n"
-
+        test_header = (
+            "" if current_diagnostics.has_header else f"{TestParser.TEST_START}\n"
+        )
         content = content[:current_diagnostics.start] + \
-            test_header + \
-            self.fetch_and_format_diagnostics(solc, test, sub_dir) + \
-            content[current_diagnostics.end:]
+                test_header + \
+                self.fetch_and_format_diagnostics(solc, test, sub_dir) + \
+                content[current_diagnostics.end:]
 
         with open(self.get_test_file_path(test, sub_dir), mode="w", encoding="utf-8", newline='') as f:
             f.write(content)
@@ -1197,7 +1197,7 @@ class SolidityLSPTestSuite: # {{{
                 }
             }
         )
-        message = "Goto definition (" + description + ")"
+        message = f"Goto definition ({description})"
         self.expect_equal(len(response['result']), 1, message)
         self.expect_location(response['result'][0], expected_uri, expected_lineNo, expected_startEndColumns)
 
@@ -1209,11 +1209,14 @@ class SolidityLSPTestSuite: # {{{
         """
         markers = self.get_test_tags(test, sub_dir)
 
-        for tag, tag_range in markers.items():
-            if tag_range == target_range:
-                return str(tag)
-
-        return None
+        return next(
+            (
+                str(tag)
+                for tag, tag_range in markers.items()
+                if tag_range == target_range
+            ),
+            None,
+        )
 
     def replace_ranges_with_tags(self, content, sub_dir):
         """
@@ -1646,11 +1649,13 @@ class SolidityLSPTestSuite: # {{{
 
         for sub_dir in map(lambda filepath: filepath.name, sub_dirs):
             tests = map(
-                lambda file_object, sd=sub_dir: sd + "/" + file_object.name[:-len(".sol")],
+                lambda file_object, sd=sub_dir: f"{sd}/"
+                + file_object.name[: -len(".sol")],
                 filter(
-                    lambda filepath: filepath.is_file() and filepath.name.endswith('.sol'),
-                    os.scandir(f"{self.project_root_dir}/{sub_dir}")
-                )
+                    lambda filepath: filepath.is_file()
+                    and filepath.name.endswith('.sol'),
+                    os.scandir(f"{self.project_root_dir}/{sub_dir}"),
+                ),
             )
 
             tests = map(

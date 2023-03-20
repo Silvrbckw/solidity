@@ -8,9 +8,7 @@ Overflow checked signed integer addition.
 """
 
 n_bits = 256
-type_bits = 8
-
-while type_bits <= n_bits:
+for type_bits in range(8, n_bits + 1, 8):
 
 	rule = Rule()
 
@@ -38,8 +36,6 @@ while type_bits <= n_bits:
 	else:
 		overflow_check = SGT(sum_, maxValue)
 		underflow_check = SLT(sum_, minValue)
-
-	type_bits += 8
 
 	rule.check(actual_overflow, overflow_check != 0)
 	rule.check(actual_underflow, underflow_check != 0)
